@@ -9,7 +9,7 @@ const CONTRACT_ABI = [
   {"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"jobs","outputs":[{"internalType":"address","name":"poster","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"string","name":"details","type":"string"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"bool","name":"funded","type":"bool"},{"internalType":"bool","name":"completed","type":"bool"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"string","name":"details","type":"string"},{"internalType":"address","name":"recipient","type":"address"}],"name":"postJob","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"payable","type":"function"}
 ];
-const CONTRACT_ADDRESS = "0xA0Ba4B0E06f545F2A446A1978045C7D2a6d9c3c7";
+const CONTRACT_ADDRESS = "0x4476C2B38bc7B953FaF99Cacf9466c5E91F2Db7a";
 
 export default function Home() {
   const [walletAddress, setWalletAddress] = useState("");
@@ -66,7 +66,7 @@ export default function Home() {
       // Validate recipient address
       if (!/^0x[a-fA-F0-9]{40}$/.test(recipient)) {
         setStatus("Invalid recipient address");
-        console.error("Invalid recipient address");
+        console.error("Invalid recipient address", recipient);
         return;
       }
       // Validate amount
@@ -75,29 +75,54 @@ export default function Home() {
         parsedAmount = ethers.parseEther(amount);
       } catch (err) {
         setStatus("Invalid amount format");
-        console.error("Invalid amount format", err);
+        console.error("Invalid amount format", err, amount);
         return;
       }
       if (parsedAmount <= 0) {
         setStatus("Amount must be greater than 0");
-        console.error("Amount must be greater than 0");
+        console.error("Amount must be greater than 0", parsedAmount);
+        return;
+      }
+      // Check wallet balance before posting job
+      const signer = await provider.getSigner();
+      const balance = await provider.getBalance(await signer.getAddress());
+      console.log('Wallet balance:', ethers.formatEther(balance));
+      if (balance < parsedAmount) {
+        setStatus("Insufficient wallet balance. Balance: " + ethers.formatEther(balance));
+        console.error("Insufficient wallet balance.", balance, parsedAmount);
         return;
       }
       console.log('Provider:', provider);
-      const signer = await provider.getSigner();
       console.log('Signer:', signer);
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       console.log('Contract:', contract);
       console.log('Details:', details, 'Recipient:', recipient, 'Amount:', amount);
-      const tx = await contract.postJob(details, recipient, {
-        value: parsedAmount,
-        gasLimit: 150000,
-        gasPrice: ethers.parseUnits('1', 'gwei')
-      });
-      console.log('Transaction sent:', tx);
-      await tx.wait();
-      setStatus("Job posted!");
-      console.log('Job posted!');
+      try {
+        const tx = await contract.postJob(details, recipient, {
+          value: parsedAmount,
+          gasLimit: 150000,
+          gasPrice: ethers.parseUnits('1', 'gwei')
+        });
+        console.log('Transaction sent:', tx);
+        await tx.wait();
+        // MOCK jobId for backend notification
+        const jobId = Math.floor(Math.random() * 1000000);
+
+        // Notify backend
+        await fetch("http://localhost:3001/job", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId }),
+        });
+
+        setSuccess("Job posted and backend notified!");
+      } catch (txErr) {
+        setStatus("Error posting job: " + (txErr?.message || txErr));
+        console.error('Error posting job:', txErr);
+        if (txErr?.receipt) {
+          console.error('Transaction receipt:', txErr.receipt);
+        }
+      }
     } catch (err) {
       setStatus("Error: " + (err?.message || err));
       console.error('Error posting job:', err);

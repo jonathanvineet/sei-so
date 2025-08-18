@@ -6,7 +6,7 @@ module.exports = {
   solidity: "0.8.20",
   networks: {
     sei: {
-      url: "https://rpc.wallet.atlantic-2.sei.io",
+  url: "https://evm-rpc-testnet.sei-apis.com",
       chainId: 713715,
       accounts: [process.env.PRIVATE_KEY]
     }

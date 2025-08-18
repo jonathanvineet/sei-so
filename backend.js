@@ -1,22 +1,35 @@
 require('dotenv').config();
+const express = require('express');
 const { ethers } = require('ethers');
-const CONTRACT_ABI = [
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"jobId","type":"uint256"},{"indexed":true,"internalType":"address","name":"recipient","type":"address"}],"name":"JobCompleted","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"jobId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"JobFunded","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"jobId","type":"uint256"},{"indexed":true,"internalType":"address","name":"poster","type":"address"},{"indexed":false,"internalType":"string","name":"details","type":"string"},{"indexed":false,"internalType":"address","name":"recipient","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"JobPosted","type":"event"},
-  {"inputs":[{"internalType":"uint256","name":"jobId","type":"uint256"}],"name":"confirmDelivery","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[],"name":"jobCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"jobs","outputs":[{"internalType":"address","name":"poster","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"string","name":"details","type":"string"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"bool","name":"funded","type":"bool"},{"internalType":"bool","name":"completed","type":"bool"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"string","name":"details","type":"string"},{"internalType":"address","name":"recipient","type":"address"}],"name":"postJob","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"payable","type":"function"}
-];
-const CONTRACT_ADDRESS = "0xA0Ba4B0E06f545F2A446A1978045C7D2a6d9c3c7";
-const provider = new ethers.JsonRpcProvider("https://rpc.sei-testnet.com");
+require('dotenv').config();
+
+const CONTRACT_ABI = require('./artifacts/contracts/DeliveryEscrow.sol/DeliveryEscrow.json').abi;
+const CONTRACT_ADDRESS = "0x4476C2B38bc7B953FaF99Cacf9466c5E91F2Db7a";
+const provider = new ethers.JsonRpcProvider("https://evm-rpc-testnet.sei-apis.com");
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
 
-// Listen for new jobs
-contract.on("JobPosted", (jobId, poster, details, recipient, amount) => {
-  console.log(`New job posted: ${jobId} by ${poster}, details: ${details}`);
+const app = express();
+app.use(express.json());
+
+app.post('/job', async (req, res) => {
+  const { jobId } = req.body;
+  console.log(`[LOCAL] Job posted: jobId=${jobId}`);
+  setTimeout(async () => {
+    try {
+      console.log(`[ACTION] Confirming delivery for job ${jobId} after 10 seconds...`);
+      const tx = await contract.confirmDelivery(jobId);
+      await tx.wait();
+      console.log(`[SUCCESS] Delivery confirmed for job ${jobId}`);
+    } catch (err) {
+      console.error(`[ERROR] Confirming delivery for job ${jobId}:`, err);
+    }
+  }, 10000);
+  res.json({ status: 'Job received', jobId });
+});
+
+app.listen(3001, () => {
+  console.log('Backend server running on http://localhost:3001');
 });
 
 // Post a new job
