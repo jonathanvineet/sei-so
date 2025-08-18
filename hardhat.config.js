@@ -5,9 +5,9 @@ require('@nomicfoundation/hardhat-toolbox');
 module.exports = {
   solidity: "0.8.20",
   networks: {
-    sei: {
-  url: "https://evm-rpc-testnet.sei-apis.com",
-      chainId: 713715,
+    sei_testnet: {
+      url: "https://evm-rpc-testnet.sei-apis.com",
+      chainId: 1328,
       accounts: [process.env.PRIVATE_KEY]
     }
   }
