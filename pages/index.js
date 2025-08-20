@@ -55,6 +55,8 @@ export default function Home() {
   const [details, setDetails] = useState("");
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
+  const [totalAmount, setTotalAmount] = useState("");
+  const [droneFee, setDroneFee] = useState("");
   const [jobId, setJobId] = useState("");
   const [status, setStatus] = useState("");
 
@@ -189,10 +191,13 @@ export default function Home() {
         console.error("Invalid recipient address", recipient);
         return;
       }
-      // Validate amount
+      // Validate amount - we use totalAmount which includes the drone fee
       let parsedAmount;
       try {
-        parsedAmount = ethers.parseEther(amount);
+        // If totalAmount is set, use it (including drone fee), otherwise fall back to amount
+        const amountToSend = totalAmount || amount;
+        parsedAmount = ethers.parseEther(amountToSend);
+        console.log(`Using total amount (with 10% drone fee): ${amountToSend} SEI`);
       } catch (err) {
         setStatus("Invalid amount format");
         console.error("Invalid amount format", err, amount);
@@ -354,6 +359,23 @@ export default function Home() {
         <div>Status: {status}</div>
         <div>Wallet: {walletAddress}</div>
       </div>
+      {/* Function to calculate drone fee and total amount */}
+      <div style={{ marginTop: '1rem', marginBottom: '1rem', padding: '1rem', backgroundColor: '#f4f4f4', borderRadius: '5px' }}>
+        <h3>Drone Fee Explained</h3>
+        <p>A 10% drone fee is added to your transaction. This fee structure works as follows:</p>
+        <ul style={{ listStyleType: 'disc', paddingLeft: '1.5rem' }}>
+          <li><strong>80%</strong> of your base amount goes to the recipient</li>
+          <li><strong>10%</strong> of your base amount goes to the platform fee wallet</li>
+          <li><strong>10%</strong> drone fee is either:
+            <ul style={{ paddingLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>Sent to the assigned drone operator if a drone is assigned</li>
+              <li>Returned to you (the sender) if no drone is assigned</li>
+            </ul>
+          </li>
+        </ul>
+        <p style={{ marginTop: '0.5rem', fontStyle: 'italic' }}>Example: If you send 0.2 SEI, you'll be charged 0.22 SEI total (including 0.02 SEI drone fee)</p>
+      </div>
+
       <form
         onSubmit={e => {
           e.preventDefault();
@@ -366,23 +388,53 @@ export default function Home() {
           placeholder="Job Details"
           value={details}
           onChange={e => setDetails(e.target.value)}
-          style={{ marginRight: '1rem' }}
+          style={{ marginRight: '1rem', marginBottom: '1rem', padding: '0.5rem' }}
         />
         <input
           type="text"
           placeholder="Recipient Address"
           value={recipient}
           onChange={e => setRecipient(e.target.value)}
-          style={{ marginRight: '1rem' }}
+          style={{ marginRight: '1rem', marginBottom: '1rem', padding: '0.5rem' }}
         />
-        <input
-          type="text"
-          placeholder="Amount (SEI)"
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
-          style={{ marginRight: '1rem' }}
-        />
-        <button type="submit">Post Job</button>
+        <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '1rem' }}>
+          <input
+            type="text"
+            placeholder="Base Amount (SEI)"
+            value={amount}
+            onChange={e => {
+              const baseAmount = e.target.value;
+              setAmount(baseAmount);
+              
+              // Calculate drone fee (10% of base amount)
+              try {
+                if (baseAmount && !isNaN(parseFloat(baseAmount))) {
+                  const baseAmountFloat = parseFloat(baseAmount);
+                  const droneFeeAmount = baseAmountFloat * 0.1;
+                  const totalAmountValue = baseAmountFloat + droneFeeAmount;
+                  
+                  setDroneFee(droneFeeAmount.toFixed(6));
+                  setTotalAmount(totalAmountValue.toFixed(6));
+                } else {
+                  setDroneFee("");
+                  setTotalAmount("");
+                }
+              } catch (err) {
+                console.error("Error calculating fee:", err);
+                setDroneFee("");
+                setTotalAmount("");
+              }
+            }}
+            style={{ marginRight: '1rem', marginBottom: '0.5rem', padding: '0.5rem' }}
+          />
+          {droneFee && (
+            <div style={{ marginBottom: '0.5rem' }}>
+              <p>Drone Fee (10%): <strong>{droneFee} SEI</strong></p>
+              <p>Total Amount: <strong>{totalAmount} SEI</strong></p>
+            </div>
+          )}
+        </div>
+        <button type="submit" style={{ padding: '0.5rem 1rem', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>Post Job with Drone Fee</button>
       </form>
     </div>
   );
